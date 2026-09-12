@@ -394,15 +394,9 @@ impl RpcClient {
 fn decode_block_subscription_response(
     response: &BlockSubscriptionResponse,
 ) -> Result<(SignedBlock, BlockNumber), RpcError> {
+    let response = response.clone().decode_fields().map_err(RpcError::Conversion)?;
     let block = response
         .block
-        .clone()
-        .ok_or_else(|| {
-            RpcError::InvalidResponse("block subscription response is missing block".into())
-        })?
-        .decode_fields()
-        .map_err(ConversionError::from)
-        .map_err(RpcError::Conversion)?
         .build_unchecked()
         .map_err(ConversionError::new)
         .map_err(RpcError::Conversion)?;
@@ -568,16 +562,12 @@ impl RpcClient {
             .await
             .map_err(RpcError::GrpcClientError)?
             .into_inner()
+            .decode_fields()
+            .map_err(RpcError::Conversion)?
             .script;
 
         script
-            .map(|script| {
-                script
-                    .decode_fields()
-                    .map_err(ConversionError::from)?
-                    .verify()
-                    .map_err(ConversionError::new)
-            })
+            .map(|script| script.verify().map_err(ConversionError::new))
             .transpose()
             .map_err(RpcError::Conversion)
     }
@@ -595,7 +585,7 @@ impl RpcClient {
             .map_err(RpcError::GrpcClientError)?
             .into_inner();
 
-        AccountResponse::try_from(response).map_err(RpcError::Conversion)
+        response.decode_fields().and_then(Verify::verify).map_err(RpcError::Conversion)
     }
 }
 

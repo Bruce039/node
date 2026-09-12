@@ -3,6 +3,7 @@ pub mod block;
 pub mod encryption;
 mod limits;
 pub mod proof_request;
+pub mod sequencer;
 pub mod submission;
 
 use miden_node_tracing::{RecordAttribute, Value};

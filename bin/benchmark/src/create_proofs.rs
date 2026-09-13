@@ -195,6 +195,7 @@ pub(crate) async fn run(
         .into_inner()
         .block_header
         .expect("RPC returned no block header");
+    // SAFETY: Genesis has no parent. This benchmark trusts the configured RPC for genesis.
     let genesis_header: BlockHeader =
         genesis_header_proto.decode_fields().unwrap().build_unchecked().unwrap();
     let protocol_config = ProtocolConfig::current(AssetId::new_fungible(fee_faucet_id))

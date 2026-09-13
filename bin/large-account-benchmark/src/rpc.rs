@@ -326,6 +326,7 @@ async fn genesis_block_header(rpc: &mut RpcClient) -> Result<BlockHeader> {
         .context("RPC returned no genesis block header")?
         .decode_fields()
         .context("failed to decode the genesis block header")?
+        // SAFETY: Genesis has no parent. This benchmark trusts the configured RPC for genesis.
         .build_unchecked()
         .context("failed to build the genesis block header")
 }

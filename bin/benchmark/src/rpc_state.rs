@@ -37,6 +37,8 @@ pub(crate) async fn fetch_chain_tip_header(client: &mut RpcClient) -> BlockHeade
         .expect("chain tip response missing block_header")
         .decode_fields()
         .expect("failed to decode chain tip block header")
+        // SAFETY: This benchmark trusts the target RPC for chain state. It checks MMR consistency
+        // separately and submits generated transactions to the node for validation.
         .build_unchecked()
         .expect("failed to build chain tip block header")
 }

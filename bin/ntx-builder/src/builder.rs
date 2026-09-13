@@ -255,16 +255,16 @@ impl NetworkTransactionBuilder {
         block: SignedBlock,
         committed_tip: BlockNumber,
     ) -> anyhow::Result<(CommittedBlockEffects, Vec<AccountId>)> {
-        let header = block.header().clone();
-        let block_num = header.block_num();
-
-        let effects = CommittedBlockEffects::from_signed_block(&block);
+        let block_num = block.header().block_num();
 
         // Advance the in-memory chain (adds the previous tip header as an MMR leaf and prunes older
         // tracked headers) before snapshotting the MMR for persistence.
-        self.chain.update_chain_tip(header, self.config.max_block_count);
+        self.chain
+            .update_chain_tip(&block, self.config.max_block_count)
+            .context("failed to verify committed block")?;
         let next_mmr = self.chain.current_mmr();
 
+        let effects = CommittedBlockEffects::from_signed_block(&block);
         let effects_for_db = effects.clone();
         let sponsored_accounts = self
             .db

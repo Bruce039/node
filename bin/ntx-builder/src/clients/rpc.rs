@@ -21,7 +21,7 @@ use miden_node_proto::domain::encryption::{
 use miden_node_proto::errors::ConversionError;
 use miden_node_proto::generated::rpc::account_request::account_detail_request::{StorageMapDetailRequest, StorageMapDetailRequests, StorageRequest, storage_map_detail_request};
 use miden_node_proto::generated::rpc::account_request::account_detail_request::storage_map_detail_request::MapKeys;
-use miden_node_proto::generated::rpc::{BlockSubscriptionRequest, BlockSubscriptionResponse};
+use miden_node_proto::generated::rpc::BlockSubscriptionRequest;
 use miden_node_proto::generated::{self as proto};
 use miden_node_tracing::ErrorReport;
 use miden_node_utils::retry::{self, Retryable};
@@ -188,7 +188,7 @@ impl RpcClient {
     /// Opens a committed-block subscription starting at `block_from`, retrying indefinitely with
     /// the client's configured exponential backoff while the initial connection attempt fails.
     ///
-    /// Returns a stream that decodes each [`BlockSubscriptionResponse`] into a `(SignedBlock,
+    /// Returns a stream that decodes each [`proto::rpc::BlockSubscriptionResponse`] into a `(SignedBlock,
     /// committed_chain_tip)` pair. The committed chain tip is the latest block the node believes
     /// is committed at the moment the response was emitted; the ntx-builder uses it to decide
     /// when it has caught up to the live tip.
@@ -220,7 +220,15 @@ impl RpcClient {
             // `&self`, so callers like `block_subscription_reconnecting` can store it freely.
             Ok(stream
                 .map_err(RpcError::GrpcClientError)
-                .and_then(|response| async move { decode_block_subscription_response(&response) })
+                .and_then(|response| async move {
+                    response
+                        .decode_fields()
+                        // SAFETY: The builder verifies signatures and linkage against its trusted
+                        // parent before updating chain state, writing block effects, or notifying
+                        // account actors.
+                        .and_then(BuildUnchecked::build_unchecked)
+                        .map_err(RpcError::Conversion)
+                })
                 .boxed())
         })
         .retry(self.backoff)
@@ -389,19 +397,6 @@ impl RpcClient {
         .await
         .map(|_| ())
     }
-}
-
-fn decode_block_subscription_response(
-    response: &BlockSubscriptionResponse,
-) -> Result<(SignedBlock, BlockNumber), RpcError> {
-    let response = response.clone().decode_fields().map_err(RpcError::Conversion)?;
-    let block = response
-        .block
-        .build_unchecked()
-        .map_err(ConversionError::new)
-        .map_err(RpcError::Conversion)?;
-    let committed_tip = BlockNumber::from(response.committed_chain_tip);
-    Ok((block, committed_tip))
 }
 
 // ACTOR-PATH METHODS
